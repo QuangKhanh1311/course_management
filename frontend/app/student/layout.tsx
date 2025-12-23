@@ -1,20 +1,33 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
-    const role = localStorage.getItem("role")
-    if (role !== "student") {
-      router.push("/auth/login")
+    const raw = localStorage.getItem("user")
+
+    if (!raw) {
+      router.replace("/auth/login")
+      return
     }
-  }, [router])
+
+    try {
+      const user = JSON.parse(raw)
+
+      if (user.role !== "student") {
+        router.replace("/auth/login")
+      }
+    } catch {
+      localStorage.removeItem("user")
+      router.replace("/auth/login")
+    }
+  }, [router, pathname])
 
   return (
     <>

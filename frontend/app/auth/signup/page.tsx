@@ -1,18 +1,34 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+import { AuthService } from "@/services/auth.service"
+import { TeacherService } from "@/services/teacher.service"
 
 export default function SignupPage() {
   const router = useRouter()
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -20,18 +36,16 @@ export default function SignupPage() {
     confirmPassword: "",
     role: "student",
   })
+
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   const handleRoleChange = (value: string) => {
-    setFormData({ ...formData, role: value })
+    setFormData((prev) => ({ ...prev, role: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,37 +60,53 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role: formData.role,
-        }),
+      // 1️⃣ Register
+      const result = await AuthService.register({
+        full_name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
       })
 
-      const data = await response.json()
+      const token = result.token
+      const user = result.user || result.data
 
-      if (!response.ok) {
-        setError(data.error || "Signup failed")
-        return
+      if (!user) {
+        throw new Error("Register failed: invalid response")
       }
 
-      localStorage.setItem("token", data.token)
-      localStorage.setItem("role", data.role)
-      localStorage.setItem("userId", data.userId)
+      // 2️⃣ Save auth
+      if (token) {
+        localStorage.setItem("token", token)
+      }
+      localStorage.setItem("user", JSON.stringify(user))
 
-      if (data.role === "instructor") {
-        router.push("/instructor/dashboard")
-      } else if (data.role === "admin") {
+      // 3️⃣ TEACHER FLOW
+      if (user.role === "teacher") {
+        try {
+          const existedTeacher = await TeacherService.getByUserId(user._id)
+
+          if (!existedTeacher) {
+            await TeacherService.create({ user_id: user._id })
+          }
+
+          router.push("/teacher/qualification")
+          return
+        } catch (err) {
+          console.error(err)
+          setError("Cannot create teacher profile")
+          return
+        }
+      }
+
+      // 4️⃣ ADMIN / STUDENT
+      if (user.role === "admin") {
         router.push("/admin/dashboard")
       } else {
         router.push("/student/courses")
       }
-    } catch (err) {
-      setError("An error occurred. Please try again.")
+    } catch (err: any) {
+      setError(err?.message || "An error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -87,18 +117,23 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create Account</CardTitle>
-          <CardDescription>Join EduHub and start learning or teaching</CardDescription>
+          <CardDescription>
+            Join EduHub and start learning or teaching
+          </CardDescription>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">{error}</div>}
+            {error && (
+              <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                {error}
+              </div>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label>Full Name</Label>
               <Input
-                id="name"
                 name="name"
-                placeholder="John Doe"
                 value={formData.name}
                 onChange={handleChange}
                 required
@@ -106,12 +141,10 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label>Email</Label>
               <Input
-                id="email"
                 name="email"
                 type="email"
-                placeholder="you@example.com"
                 value={formData.email}
                 onChange={handleChange}
                 required
@@ -119,25 +152,23 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="role">I am a</Label>
+              <Label>I am a</Label>
               <Select value={formData.role} onValueChange={handleRoleChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="student">Student</SelectItem>
-                  <SelectItem value="instructor">Instructor</SelectItem>
+                  <SelectItem value="teacher">Teacher</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label>Password</Label>
               <Input
-                id="password"
                 name="password"
                 type="password"
-                placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
                 required
@@ -145,12 +176,10 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label>Confirm Password</Label>
               <Input
-                id="confirmPassword"
                 name="confirmPassword"
                 type="password"
-                placeholder="••••••••"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required

@@ -1,10 +1,21 @@
-// backend/src/controllers/EnrollmentController.js
 import Enrollment from "../models/Enrollment.js";
 
-// Create enrollment mới (ghi danh khóa học)
+// Create enrollment (ghi danh khóa học)
 export const createEnrollment = async (req, res) => {
   try {
-    const newEnrollment = new Enrollment(req.body);
+    const { course_id, user_id } = req.body;
+
+    if (!course_id || !user_id) {
+      return res.status(400).json({ success: false, message: "course_id và user_id bắt buộc" });
+    }
+
+    // Kiểm tra xem học viên đã enroll chưa
+    const exists = await Enrollment.findOne({ course_id, user_id });
+    if (exists) {
+      return res.status(400).json({ success: false, message: "Bạn đã ghi danh khóa học này rồi" });
+    }
+
+    const newEnrollment = new Enrollment({ course_id, user_id });
     await newEnrollment.save();
     res.status(201).json({ success: true, data: newEnrollment });
   } catch (error) {
@@ -12,13 +23,14 @@ export const createEnrollment = async (req, res) => {
   }
 };
 
-// Get all enrollments (có thể filter by student_id hoặc course_id qua query)
+// Get all enrollments (filter bằng user_id hoặc course_id)
 export const getAllEnrollments = async (req, res) => {
   try {
     const query = {};
-    if (req.query.student_id) query.student_id = req.query.student_id;
+    if (req.query.user_id) query.user_id = req.query.user_id;
     if (req.query.course_id) query.course_id = req.query.course_id;
-    const enrollments = await Enrollment.find(query).populate(["course_id", "student_id"]);
+
+    const enrollments = await Enrollment.find(query).populate(["course_id", "user_id"]);
     res.status(200).json({ success: true, data: enrollments });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -28,7 +40,7 @@ export const getAllEnrollments = async (req, res) => {
 // Get enrollment by ID
 export const getEnrollmentById = async (req, res) => {
   try {
-    const enrollment = await Enrollment.findById(req.params.id).populate(["course_id", "student_id"]);
+    const enrollment = await Enrollment.findById(req.params.id).populate(["course_id", "user_id"]);
     if (!enrollment) {
       return res.status(404).json({ success: false, message: "Enrollment không tồn tại" });
     }

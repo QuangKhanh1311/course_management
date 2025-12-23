@@ -4,25 +4,37 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+type User = {
+  _id: string
+  role: "student" | "instructor" | "admin"
+}
 
 export function Navbar() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const role = localStorage.getItem("role")
-    const userId = localStorage.getItem("userId")
-    if (role && userId) {
-      setUser({ role, userId })
+    const raw = localStorage.getItem("user")
+    if (!raw) return
+
+    try {
+      const parsed = JSON.parse(raw)
+      setUser(parsed)
+    } catch {
+      localStorage.removeItem("user")
     }
   }, [])
 
   const handleLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("role")
-    localStorage.removeItem("userId")
-    router.push("/")
+    localStorage.clear() // hoặc removeItem("user")
+    router.replace("/")
   }
 
   if (!user) return null
@@ -40,11 +52,13 @@ export function Navbar() {
               <Button variant="ghost">Courses</Button>
             </Link>
           )}
+
           {user.role === "instructor" && (
             <Link href="/instructor/dashboard">
               <Button variant="ghost">Dashboard</Button>
             </Link>
           )}
+
           {user.role === "admin" && (
             <Link href="/admin/dashboard">
               <Button variant="ghost">Admin</Button>
@@ -56,7 +70,9 @@ export function Navbar() {
               <Button variant="outline">Menu</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                Logout
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

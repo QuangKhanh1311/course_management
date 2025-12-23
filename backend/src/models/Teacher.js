@@ -4,11 +4,10 @@ import mongoose from "mongoose";
 const teacherSchema = new mongoose.Schema({
   qualification: {
     type: String,
-    trim: true,
   },
   isActive: {
     type: Boolean,
-    default: true,
+    default: false,
   },
   user_id: {
     type: mongoose.Schema.Types.ObjectId,

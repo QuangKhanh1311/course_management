@@ -7,109 +7,114 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, CheckCircle2, XCircle } from "lucide-react"
+import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { LessonService } from "@/services/lesson.service"
+import { QuizService } from "@/services/quiz.service"
+import { QuizResultService } from "@/services/quizResult.service"
 
 export default function QuizPage() {
   const params = useParams()
   const router = useRouter()
   const courseId = params.id as string
+
+  const [studentId, setStudentId] = useState<string | null>(null)
+  const [currentLessonId, setCurrentLessonId] = useState<string | null>(null)
   const [quiz, setQuiz] = useState<any>(null)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<number[]>([])
   const [submitted, setSubmitted] = useState(false)
   const [score, setScore] = useState(0)
-  const [passed, setPassed] = useState(false)
+  const [results, setResults] = useState<boolean[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
+  const letters = ["A","B","C","D"] // map index -> letter
+
+  // Lấy studentId từ localStorage
   useEffect(() => {
-    // Mock quiz data
-    const mockQuiz = {
-      id: "quiz-1",
-      title: "React Fundamentals Quiz",
-      description: "Test your knowledge of React basics",
-      passingScore: 70,
-      questions: [
-        {
-          id: "q1",
-          question: "What is React?",
-          options: [
-            "A JavaScript library for building user interfaces",
-            "A Python framework",
-            "A CSS preprocessor",
-            "A database management system",
-          ],
-          correctAnswer: 0,
-          explanation:
-            "React is a JavaScript library developed by Facebook for building user interfaces with reusable components.",
-        },
-        {
-          id: "q2",
-          question: "What is JSX?",
-          options: ["A type of database", "A syntax extension to JavaScript", "A CSS framework", "A testing library"],
-          correctAnswer: 1,
-          explanation: "JSX is a syntax extension to JavaScript that allows you to write HTML-like code in JavaScript.",
-        },
-        {
-          id: "q3",
-          question: "What is the purpose of state in React?",
-          options: [
-            "To store static data",
-            "To manage component data that can change",
-            "To define CSS styles",
-            "To handle HTTP requests",
-          ],
-          correctAnswer: 1,
-          explanation: "State is used to manage data that can change over time and trigger re-renders when updated.",
-        },
-        {
-          id: "q4",
-          question: "What are props in React?",
-          options: [
-            "Properties passed from parent to child components",
-            "Methods for styling components",
-            "Database queries",
-            "Server-side functions",
-          ],
-          correctAnswer: 0,
-          explanation: "Props are arguments passed into React components, similar to function parameters.",
-        },
-        {
-          id: "q5",
-          question: "What is a React Hook?",
-          options: [
-            "A way to hook into React features",
-            "A CSS property",
-            "A database connection",
-            "A testing framework",
-          ],
-          correctAnswer: 0,
-          explanation: "Hooks are functions that let you use state and other React features in functional components.",
-        },
-      ],
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser)
+        setStudentId(user._id)
+      } catch {
+        setStudentId(null)
+      }
     }
+  }, [])
 
-    setQuiz(mockQuiz)
-    setAnswers(new Array(mockQuiz.questions.length).fill(-1))
-  }, [courseId])
+  // Fetch lesson + quiz
+ // Fetch lesson + quiz
+useEffect(() => {
+  if (!studentId) return
+
+  const fetchLessonAndQuiz = async () => {
+    try {
+      setIsLoading(true)
+
+      const lessonsRes = await LessonService.getByCourse(courseId)
+      const lessons = lessonsRes.data.sort((a: any, b: any) => a.order - b.order)
+      if (lessons.length === 0) {
+        alert("Course này chưa có bài học")
+        router.push("/student/courses")
+        return
+      }
+
+      const lesson = lessons[0]
+      setCurrentLessonId(lesson._id)
+
+      const quizRes = await QuizService.getQuizzesByLesson(lesson._id)
+      // Nếu bài học chưa có quiz thì redirect
+      if (!quizRes.data || quizRes.data.length === 0) {
+        alert("Bài học này chưa có quiz")
+        router.push(`/student/courses/${courseId}/learn`)
+        return
+      }
+
+      const lessonQuiz = quizRes.data[0]
+      setQuiz(lessonQuiz)
+      setAnswers(new Array(lessonQuiz.questions.length).fill(-1))
+      setResults(new Array(lessonQuiz.questions.length).fill(false))
+    } catch (err) {
+      console.error(err)
+      alert("Không thể tải quiz")
+      router.push(`/student/courses/${courseId}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  fetchLessonAndQuiz()
+}, [courseId, studentId, router])
 
   const handleAnswerChange = (questionIndex: number, answerIndex: number) => {
+    if (submitted) return
     const newAnswers = [...answers]
     newAnswers[questionIndex] = answerIndex
     setAnswers(newAnswers)
   }
 
-  const handleSubmitQuiz = () => {
-    if (quiz) {
-      let correctCount = 0
-      quiz.questions.forEach((question: any, index: number) => {
-        if (answers[index] === question.correctAnswer) {
-          correctCount++
-        }
-      })
+  const handleSubmitQuiz = async () => {
+    if (!quiz || !studentId) return
 
-      const calculatedScore = Math.round((correctCount / quiz.questions.length) * 100)
-      setScore(calculatedScore)
-      setPassed(calculatedScore >= quiz.passingScore)
-      setSubmitted(true)
+    const tempResults = quiz.questions.map(
+      (q: any, i: number) => letters[answers[i]] === q.correct_answer
+    )
+    const correctCount = tempResults.filter(Boolean).length
+    const calculatedScore = Math.round((correctCount / quiz.questions.length) * 100)
+
+    setResults(tempResults)
+    setScore(calculatedScore)
+    setSubmitted(true)
+
+    try {
+      await QuizResultService.create({
+        quiz_id: quiz._id,
+        student_id: studentId,
+        score: calculatedScore,
+        answers,
+      })
+    } catch (err) {
+      console.error("Không thể lưu kết quả quiz:", err)
     }
   }
 
@@ -125,76 +130,68 @@ export default function QuizPage() {
     }
   }
 
-  if (!quiz) {
+  if (isLoading || !quiz) {
     return <div className="container mx-auto px-4 py-8">Loading...</div>
   }
 
   if (submitted) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 py-8 max-w-2xl space-y-4">
         <Card>
-          <CardContent className="pt-12 text-center space-y-6">
-            {passed ? (
-              <>
-                <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
-                <div>
-                  <h2 className="text-3xl font-bold text-foreground mb-2">Congratulations!</h2>
-                  <p className="text-muted-foreground">You passed the quiz</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <XCircle className="w-16 h-16 text-destructive mx-auto" />
-                <div>
-                  <h2 className="text-3xl font-bold text-foreground mb-2">Quiz Not Passed</h2>
-                  <p className="text-muted-foreground">You need {quiz.passingScore}% to pass</p>
-                </div>
-              </>
-            )}
-
-            <div className="bg-muted p-6 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-2">Your Score</p>
-              <p className="text-4xl font-bold text-foreground">{score}%</p>
-            </div>
-
-            <div className="space-y-2">
-              {quiz.questions.map((question: any, index: number) => (
-                <div key={question.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                  {answers[index] === question.correctAnswer ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-destructive flex-shrink-0" />
-                  )}
-                  <div className="text-left flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground line-clamp-1">{question.question}</p>
-                    {answers[index] !== question.correctAnswer && (
-                      <p className="text-xs text-muted-foreground mt-1">{question.explanation}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              {passed && (
-                <Button onClick={() => router.push(`/student/courses/${courseId}/certificate`)} className="flex-1">
-                  Get Certificate
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setCurrentQuestion(0)
-                  setAnswers(new Array(quiz.questions.length).fill(-1))
-                  setSubmitted(false)
-                }}
-                className="flex-1"
-              >
-                Retake Quiz
-              </Button>
-            </div>
+          <CardContent className="pt-6 text-center">
+            <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
+            <h2 className="text-3xl font-bold text-foreground">Quiz Completed</h2>
+            <p className="text-muted-foreground">
+              You scored {score}% ({results.filter(Boolean).length}/{quiz.questions.length} correct)
+            </p>
           </CardContent>
         </Card>
+
+        {quiz.questions.map((q: any, i: number) => {
+          const selected = answers[i]
+          const isCorrect = results[i]
+          return (
+            <Card key={i} className={`border ${isCorrect ? "border-green-500" : "border-red-500"}`}>
+              <CardContent className="space-y-2">
+                <h3 className="font-semibold">{q.question_text}</h3>
+                <div className="space-y-1">
+                  {q.options.map((opt: string, idx: number) => {
+                    const optionLetter = letters[idx]
+                    const bg =
+                      selected === idx
+                        ? optionLetter === q.correct_answer
+                          ? "bg-green-200"
+                          : "bg-red-200"
+                        : ""
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-2 rounded border border-gray-300 ${bg}`}
+                      >
+                        {opt}{" "}
+                        {optionLetter === q.correct_answer && <span className="text-green-600 font-bold">✔</span>}
+                        {selected === idx && optionLetter !== q.correct_answer && <span className="text-red-600 font-bold">✖</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+
+        <Button
+          variant="outline"
+          onClick={() => {
+            setCurrentQuestion(0)
+            setAnswers(new Array(quiz.questions.length).fill(-1))
+            setResults(new Array(quiz.questions.length).fill(false))
+            setSubmitted(false)
+          }}
+          className="flex-1"
+        >
+          Retake Quiz
+        </Button>
       </div>
     )
   }
@@ -221,11 +218,11 @@ export default function QuizPage() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">{question.question}</h3>
+            <h3 className="text-lg font-semibold text-foreground">{question.question_text}</h3>
 
             <RadioGroup
               value={String(answers[currentQuestion])}
-              onValueChange={(value) => handleAnswerChange(currentQuestion, Number.parseInt(value))}
+              onValueChange={(value) => handleAnswerChange(currentQuestion, Number(value))}
             >
               <div className="space-y-3">
                 {question.options.map((option: string, index: number) => (

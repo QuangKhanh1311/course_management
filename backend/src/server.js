@@ -6,7 +6,6 @@ import cors from 'cors';
 // Import routes
 import userRoutes from "./routes/userRoutes.js";
 import teacherRoutes from "./routes/teacherRoutes.js";
-import studentRoutes from "./routes/studentRoutes.js";
 import courseRoutes from "./routes/courseRoutes.js";
 import lessonRoutes from "./routes/lessonRoutes.js";
 import enrollmentRoutes from "./routes/enrollmentRoutes.js";
@@ -29,7 +28,6 @@ app.use(cors({
 // Định tuyến API
 app.use("/api/users", userRoutes);
 app.use("/api/teachers", teacherRoutes);
-app.use("/api/students", studentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/lessons", lessonRoutes);
 app.use("/api/enrollments", enrollmentRoutes);

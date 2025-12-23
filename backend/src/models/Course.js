@@ -26,16 +26,12 @@ const courseSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: true,
+    default: false,
   },
   teacher_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Teacher",
+    ref: "User",
     required: true,
-  },
-  created_at: {
-    type: Date,
-    default: Date.now,
   },
 });
 

@@ -6,12 +6,14 @@ import {
   getCourseById,
   updateCourse,
   deleteCourse,
+  getCoursesByTeacher
 } from "../controllers/CourseController.js";
 
 const router = express.Router();
 
 router.post("/", createCourse);
 router.get("/", getAllCourses);
+router.get("/teacher-courses", getCoursesByTeacher);
 router.get("/:id", getCourseById);
 router.put("/:id", updateCourse);
 router.delete("/:id", deleteCourse);

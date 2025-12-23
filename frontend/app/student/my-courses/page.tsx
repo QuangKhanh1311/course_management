@@ -16,7 +16,7 @@ export default function MyCoursesPage() {
       {
         id: "1",
         title: "React Fundamentals",
-        instructor: "Jane Instructor",
+        teacher: "Jane teacher",
         progress: 100,
         lessonsCompleted: 20,
         totalLessons: 20,
@@ -27,7 +27,7 @@ export default function MyCoursesPage() {
       {
         id: "3",
         title: "Web Design Basics",
-        instructor: "Design Expert",
+        teacher: "Design Expert",
         progress: 40,
         lessonsCompleted: 8,
         totalLessons: 20,
@@ -64,7 +64,7 @@ export default function MyCoursesPage() {
               <div className="h-40 bg-gradient-to-br from-primary/20 to-secondary/20" />
               <CardHeader>
                 <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                <CardDescription>{course.instructor}</CardDescription>
+                <CardDescription>{course.teacher}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">

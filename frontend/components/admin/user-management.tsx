@@ -1,14 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Search, Trash2, Shield } from "lucide-react"
+import { Search, Trash2, Shield, XCircle } from "lucide-react"
+import { TeacherService } from "@/services/teacher.service"
+import { Button } from "@/components/ui/button"
 
 interface UserManagementProps {
-  users: any[]
+  users: {
+    teacherId: string
+    userId: string
+    name: string
+    email: string
+    qualification?: string
+    isActive: boolean
+  }[]
 }
 
 export function UserManagement({ users: initialUsers }: UserManagementProps) {
@@ -16,79 +24,119 @@ export function UserManagement({ users: initialUsers }: UserManagementProps) {
   const [searchTerm, setSearchTerm] = useState("")
 
   const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
+    (u) =>
+      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleDeleteUser = (id: string) => {
-    setUsers(users.filter((u) => u.id !== id))
+  const getStatus = (user: any) => {
+    if (user.status === "Rejected") return "Rejected"
+    if (!user.qualification) return "Not Submitted"
+    if (!user.isActive) return "Pending"
+    return "Active"
+  }
+
+  const handleApprove = async (user: any) => {
+    try {
+      await TeacherService.update(user.teacherId, { isActive: true })
+      setUsers(users.map((u) => u.teacherId === user.teacherId ? { ...u, isActive: true } : u))
+    } catch (err) {
+      console.error("Approve failed", err)
+    }
+  }
+
+  const handleDismiss = async (user: any) => {
+    try {
+      await TeacherService.update(user.teacherId, { isActive: false })
+      setUsers(users.map((u) => u.teacherId === user.teacherId ? { ...u, status: "Rejected" } : u))
+    } catch (err) {
+      console.error("Dismiss failed", err)
+    }
+  }
+
+  const handleDelete = (teacherId: string) => {
+    setUsers(users.filter((u) => u.teacherId !== teacherId))
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>User Management</CardTitle>
-        <CardDescription>Manage platform users and their roles</CardDescription>
+        <CardTitle>Teacher Management</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+      <CardContent>
+        <div className="mb-4 relative">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search teachers..."
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-3 px-4 font-semibold text-foreground">Name</th>
-                <th className="text-left py-3 px-4 font-semibold text-foreground">Email</th>
-                <th className="text-left py-3 px-4 font-semibold text-foreground">Role</th>
-                <th className="text-left py-3 px-4 font-semibold text-foreground">Joined</th>
-                <th className="text-left py-3 px-4 font-semibold text-foreground">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-foreground">Actions</th>
+                <th className="text-left py-2 px-4">Name</th>
+                <th className="text-left py-2 px-4">Email</th>
+                <th className="text-left py-2 px-4">Qualification</th>
+                <th className="text-left py-2 px-4">Status</th>
+                <th className="text-left py-2 px-4">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b hover:bg-muted/50 transition-colors">
-                  <td className="py-3 px-4 text-foreground">{user.name}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{user.email}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant="outline" className="capitalize">
-                      {user.role}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4 text-muted-foreground">{user.joinedAt}</td>
-                  <td className="py-3 px-4">
-                    <Badge className="bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
-                      {user.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline">
-                        <Shield className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive bg-transparent"
-                        onClick={() => handleDeleteUser(user.id)}
+              {filteredUsers.map((u) => {
+                const status = getStatus(u)
+                return (
+                  <tr key={u.teacherId} className="border-b hover:bg-muted/50">
+                    <td className="py-2 px-4">{u.name}</td>
+                    <td className="py-2 px-4">{u.email}</td>
+                    <td className="py-2 px-4">
+                      {u.qualification ? (
+                        <a
+                          href={u.qualification}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline"
+                        >
+                          View
+                        </a>
+                      ) : "-"}
+                    </td>
+                    <td className="py-2 px-4">
+                      <Badge
+                        className={
+                          status === "Active"
+                            ? "bg-green-500/20 text-green-700 border-green-500/30"
+                            : status === "Pending"
+                            ? "bg-yellow-500/20 text-yellow-700 border-yellow-500/30"
+                            : status === "Rejected"
+                            ? "bg-red-500/20 text-red-700 border-red-500/30"
+                            : "bg-gray-500/20 text-gray-700 border-gray-500/30"
+                        }
                       >
+                        {status}
+                      </Badge>
+                    </td>
+                    <td className="py-2 px-4 flex gap-2">
+                      {status === "Pending" && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleApprove(u)}>
+                            <Shield className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDismiss(u)}>
+                            <XCircle className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      <Button size="sm" variant="outline" className="text-destructive" onClick={() => handleDelete(u.teacherId)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

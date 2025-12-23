@@ -1,57 +1,65 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+import { useAuth } from "@/hooks/useAuth"
+import { TeacherService } from "@/services/teacher.service"
+
 export default function LoginPage() {
   const router = useRouter()
+  const { login, loading, error } = useAuth()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
-    setIsLoading(true)
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
+    const user = await login(email, password)
+    if (!user) return
 
-      const data = await response.json()
+    console.log("LOGIN USER =", user)
 
-      if (!response.ok) {
-        setError(data.error || "Login failed")
-        return
-      }
-
-      localStorage.setItem("token", data.token)
-      localStorage.setItem("role", data.role)
-      localStorage.setItem("userId", data.userId)
-
-      if (data.role === "instructor") {
-        router.push("/instructor/dashboard")
-      } else if (data.role === "admin") {
-        router.push("/admin/dashboard")
-      } else {
-        router.push("/student/courses")
-      }
-    } catch (err) {
-      setError("An error occurred. Please try again.")
-    } finally {
-      setIsLoading(false)
+    // ADMIN
+    if (user.role === "admin") {
+      router.push("/admin/dashboard")
+      return
     }
+
+    // TEACHER
+    if (user.role === "teacher") {
+      try {
+        const teacher = await TeacherService.getByUserId(user._id)
+
+        // chưa có hồ sơ teacher
+        if (!teacher) {
+          router.push("/teacher/qualification")
+          return
+        }
+
+        // chưa được duyệt
+        if (!teacher.isActive) {
+          router.push("/teacher/qualification")
+        } else {
+          router.push("/teacher/dashboard")
+        }
+      } catch (err) {
+        console.error("Fetch teacher failed", err)
+        router.push("/teacher/qualification")
+      }
+      return
+    }
+
+    // STUDENT
+    router.push("/student/courses")
   }
 
   return (
@@ -61,9 +69,14 @@ export default function LoginPage() {
           <CardTitle>Sign In to EduHub</CardTitle>
           <CardDescription>Enter your credentials to access your account</CardDescription>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">{error}</div>}
+            {error && (
+              <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                {error}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -89,8 +102,8 @@ export default function LoginPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
@@ -101,13 +114,6 @@ export default function LoginPage() {
                 Sign up
               </Link>
             </p>
-          </div>
-
-          <div className="mt-4 p-3 bg-muted rounded-md text-xs text-muted-foreground">
-            <p className="font-semibold mb-2">Demo Credentials:</p>
-            <p>Student: student@example.com / password</p>
-            <p>Instructor: instructor@example.com / password</p>
-            <p>Admin: admin@example.com / password</p>
           </div>
         </CardContent>
       </Card>

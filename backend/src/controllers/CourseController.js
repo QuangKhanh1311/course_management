@@ -60,3 +60,12 @@ export const deleteCourse = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+export const getCoursesByTeacher = async (req, res) => {
+  try {
+    const { teacherId } = req.query; // lấy teacherId từ query param
+    const courses = await Course.find({ teacher_id: teacherId }).populate("teacher_id");
+    res.status(200).json({ success: true, data: courses });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

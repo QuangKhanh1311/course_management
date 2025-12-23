@@ -8,7 +8,7 @@ import { Star, Users } from "lucide-react"
 interface CourseCardProps {
   course: any
   isEnrolled: boolean
-  onEnroll: () => void
+  onEnroll: () => Promise<void>
 }
 
 export function CourseCard({ course, isEnrolled, onEnroll }: CourseCardProps) {
@@ -42,16 +42,19 @@ export function CourseCard({ course, isEnrolled, onEnroll }: CourseCardProps) {
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-2xl font-bold text-foreground">${course.price}</span>
+          <span className="text-2xl font-bold text-foreground">${course.price ?? 0}</span>
+
           {isEnrolled ? (
-            <Link href={`/student/courses/${course.id}/learn`}>
+            <Link href={`/student/courses/${course._id}/learn`}>
               <Button size="sm">Continue</Button>
             </Link>
+          ) : course.price === 0 ? (
+            <Button size="sm" onClick={onEnroll}>
+              Enroll
+            </Button>
           ) : (
-            <Link href={`/student/checkout/${course.id}`}>
-              <Button size="sm" onClick={onEnroll}>
-                Enroll
-              </Button>
+            <Link href={`/student/checkout/${course._id}`}>
+              <Button size="sm">Enroll</Button>
             </Link>
           )}
         </div>

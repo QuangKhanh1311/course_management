@@ -33,25 +33,55 @@ export const registerUser = async (req, res) => {
 };
 
 // Login user (so sánh password)
+import jwt from "jsonwebtoken"
+
+// Login user
 export const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email })
     if (!user) {
-      return res.status(404).json({ success: false, message: "User không tồn tại" });
+      return res.status(404).json({
+        success: false,
+        message: "User không tồn tại",
+      })
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password)
     if (!isMatch) {
-      return res.status(400).json({ success: false, message: "Mật khẩu sai" });
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu sai",
+      })
     }
 
-    res.status(200).json({ success: true, data: user });
+    // Tạo JWT
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    )
+
+    // Trả dữ liệu GỌN – KHÔNG trả password
+    res.status(200).json({
+      success: true,
+      token,
+      user: {
+        _id: user._id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+      },
+    })
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    })
   }
-};
+}
+
 
 // Get all users
 export const getAllUsers = async (req, res) => {
